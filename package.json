@@ -4,6 +4,7 @@
     "description": "HL7 Language Support for Visual Studio Code",
     "version": "0.0.1",
     "publisher": "pbrooks",
+    "icon": "images/hl7-icon.png",
     "galleryBanner": {
         "color": "#FFFFFF",
         "theme": "light"

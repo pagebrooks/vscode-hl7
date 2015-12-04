@@ -15,3 +15,6 @@ Clone the [GitHub repository](https://github.com/pagebrooks/vscode-hl7) under yo
 
 ## Issues / Feature requests
 You can submit your issues and feature requests on the GitHub [issues page](https://github.com/pagebrooks/vscode-hl7/issues).
+
+## More information
+* [vscode-hl7 on the Visual Studio Marketplace](https://marketplace.visualstudio.com/items/pbrooks.hl7)

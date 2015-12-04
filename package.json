@@ -1,0 +1,26 @@
+{
+	"name": "hl7",
+	"displayName": "HL7",
+	"description": "HL7 Language Support for Visual Studio Code",
+	"version": "0.0.1",
+	"publisher": "pbrooks",
+	"engines": {
+		"vscode": "^0.10.1"
+	},
+	"categories": [
+		"Languages"
+	],
+	"contributes": {
+		"languages": [{
+			"id": "hl7",
+			"aliases": ["HL7", "hl7"],
+			"extensions": [".hl7"],
+			"configuration": "./hl7.configuration.json"
+		}],
+		"grammars": [{
+			"language": "hl7",
+			"scopeName": "text.hl7",
+			"path": "./syntaxes/hl7.tmLanguage"
+		}]
+	}
+}

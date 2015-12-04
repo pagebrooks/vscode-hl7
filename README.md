@@ -1,13 +1,17 @@
-# README
-## This is the README for your extension "hl7" 
-You can author your README using Visual Studio Code.  Here are some useful editor keyboard shortcuts:
+# [HL7](http://www.hl7.org/) language support for [Visual Studio Code](https://code.visualstudio.com/)
 
-* Split the editor (`Cmd+\` on OSX or `Ctrl+\` on Windows and Linux)
-* Toggle preview (`Shift+CMD+V` on OSX or `Shift+Ctrl+V` on Windows and Linux)
-* Press `Ctrl+Space` (Windows, Linux) or `Cmd+Space` (OSX) to see a list of Markdown snippets
+## Features
+### Syntax coloring
+![Syntax coloring](images/syntax.png)
 
-### For more information
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+## Installation
+### Visual Studio Code
+Hit `F1` and enter the `ext install hl7` command.
 
-** Enjoy!**
+### Installing the extension Locally
+Clone the [GitHub repository](https://github.com/pagebrooks/vscode-hl7) under your local extensions folder:
+* Windows: `%USERPROFILE%\.vscode\extensions`
+* Mac / Linux: `$HOME/.vscode/extensions`
+
+## Issues / Feature requests
+You can submit your issues and feature requests on the GitHub [issues page](https://github.com/pagebrooks/vscode-hl7/issues).

@@ -22,8 +22,13 @@
         "vscode": "^0.10.1"
     },
     "categories": [
-        "Languages"
+        "Languages",
+        "Other"
     ],
+	"activationEvents": [
+		"onCommand:extension.filterSegment"
+	],
+	"main": "./extension",    
     "contributes": {
         "languages": [
             {
@@ -44,6 +49,13 @@
                 "scopeName": "text.hl7",
                 "path": "./syntaxes/hl7.tmLanguage"
             }
-        ]
+        ],
+        "commands": [{
+            "command": "extension.filterSegment",
+            "title": "Filter Segment"
+        }]
+    },
+    "devdependencies": {
+        "vscode": "0.10.x"
     }
 }

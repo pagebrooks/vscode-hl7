@@ -2,7 +2,7 @@
     "name": "hl7",
     "displayName": "HL7",
     "description": "HL7 Language Support for Visual Studio Code",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "publisher": "pbrooks",
     "icon": "images/hl7-icon.png",
     "galleryBanner": {

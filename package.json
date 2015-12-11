@@ -2,7 +2,7 @@
     "name": "hl7",
     "displayName": "HL7",
     "description": "HL7 Language Support for Visual Studio Code",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "publisher": "pbrooks",
     "icon": "images/hl7-icon.png",
     "galleryBanner": {
@@ -53,10 +53,10 @@
         ],
         "commands": [{
             "command": "extension.filterSegment",
-            "title": "Filter Segment"
+            "title": "HL7: Filter Segment"
         },{
             "command": "extension.tokenizeLine",
-            "title": "Tokenize Line"
+            "title": "HL7: Tokenize Line"
         }]
     },
     "devdependencies": {

@@ -6,29 +6,35 @@
 
 ![Syntax coloring](images/syntax.png)
 
-### Tokenize Line
+### Tokenize Line Command
 * Move the cursor to a line that you wish to tokenize.
-* F1 -> Tokenize Line
+* F1 -> HL7: Tokenize Line
 * Line will be split into fields with the ordinal and definition
 
 ![Tokenize Line](images/tokenize_line.png)
 
-### Filter Segments
+### Filter Segment Command
 * Move the cursor to a line that you wish to filter.
-* F1 -> Filter Segment
+* F1 -> HL7: Filter Segment
 * A new file will be created containing only segments that match the current line.
 
 ![Filter Segment](images/filter_segment.png)
 
 
 ## Installation
-### Visual Studio Code
-Hit `F1` and enter the `ext install hl7` command.
+### Visual Studio Code 
+Press `F1` and enter the `ext install hl7` command.
 
-### Installing the extension Locally
+### Manual Installation
 Clone the [GitHub repository](https://github.com/pagebrooks/vscode-hl7) under your local extensions folder:
 * Windows: `%USERPROFILE%\.vscode\extensions`
 * Mac / Linux: `$HOME/.vscode/extensions`
+
+Important: Make sure you run the following commands to initialize the repository submodules:
+```
+$> git submodule init
+$> git submodule update
+```
 
 ## Issues / Feature requests
 You can submit your issues and feature requests on the GitHub [issues page](https://github.com/pagebrooks/vscode-hl7/issues).

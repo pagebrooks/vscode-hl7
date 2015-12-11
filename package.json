@@ -26,7 +26,8 @@
         "Other"
     ],
 	"activationEvents": [
-		"onCommand:extension.filterSegment"
+		"onCommand:extension.filterSegment",
+        "onCommand:extension.tokenizeLine"
 	],
 	"main": "./extension",    
     "contributes": {
@@ -53,6 +54,9 @@
         "commands": [{
             "command": "extension.filterSegment",
             "title": "Filter Segment"
+        },{
+            "command": "extension.tokenizeLine",
+            "title": "Tokenize Line"
         }]
     },
     "devdependencies": {

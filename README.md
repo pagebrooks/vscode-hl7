@@ -1,4 +1,4 @@
-# [HL7](http://www.hl7.org/) language support for [Visual Studio Code](https://code.visualstudio.com/)
+# HL7 language support for Visual Studio Code
 
 ## Features
 ### Syntax coloring

@@ -2,7 +2,7 @@
     "name": "hl7",
     "displayName": "HL7",
     "description": "HL7 Language Support for Visual Studio Code",
-    "version": "0.0.9",
+    "version": "0.0.11",
     "publisher": "pbrooks",
     "icon": "images/hl7-icon.png",
     "galleryBanner": {
@@ -19,7 +19,7 @@
         "url": "https://github.com/pagebrooks/vscode-hl7.git"
     },
     "engines": {
-        "vscode": "^0.10.1"
+        "vscode": "^0.10.x"
     },
     "categories": [
         "Languages",

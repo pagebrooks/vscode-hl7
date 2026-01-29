@@ -1,6 +1,8 @@
 *.hl7
 *.vsix
+.PAT
 test
+test.hl7
 images/filter_segment.png
 images/syntax.png
 images/tokenize_line.png

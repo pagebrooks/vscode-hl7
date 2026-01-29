@@ -2,7 +2,7 @@
     "name": "hl7",
     "displayName": "HL7",
     "description": "HL7 Language Support for Visual Studio Code",
-    "version": "0.0.16",
+    "version": "0.0.19",
     "publisher": "pbrooks",
     "icon": "images/hl7-icon.png",
     "galleryBanner": {
@@ -61,6 +61,9 @@
         },{
             "command": "extension.tokenizeLine",
             "title": "HL7: Tokenize Line"
+        },{
+            "command": "extension.toggleAutoTokenize",
+            "title": "HL7: Toggle Auto-Tokenize"
         }]
     },
     "devDependencies": {

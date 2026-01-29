@@ -1,9 +1,85 @@
 const vscode = require('vscode');
 const hl7v271 = require('./modules/hl7-dictionary').definitions['2.7.1'];
 
+function tokenizeLine(document, lineNum) {
+    const tokens = document.lineAt(lineNum).text.split('|');
+    const segment = tokens[0];
+    const segmentDef = hl7v271.segments[segment];
+
+    if (!segmentDef) {
+        return null;
+    }
+
+    if (segment === 'MSH') {
+        tokens.splice(1, 0, '|');
+    }
+
+    const output = [{ segment: segment + '-0', desc: segment, values: [segment] }];
+    let maxLength = 0;
+    for (let i = 1; i <= segmentDef.fields.length; i++) {
+        const desc = segmentDef.fields[i - 1].desc;
+        maxLength = Math.max(maxLength, desc.length);
+
+        const values = [];
+        if (i < tokens.length) {
+            if (segment === 'MSH' && i === 2) {
+                values.push(tokens[i]);
+            } else {
+                const subTokens = tokens[i].split('^');
+                for (let j = 0; j < subTokens.length; j++) {
+                    values.push(subTokens[j]);
+                }
+            }
+        }
+
+        output.push({
+            segment: segment + '-' + i,
+            desc: desc,
+            datatype: segmentDef.fields[i - 1].datatype,
+            values: values
+        });
+    }
+
+    let channelOutput = '';
+    for (let i = 0; i < output.length; i++) {
+        const prefix = (output[i].segment + ':').padEnd(8) +
+                       (output[i].desc + ':').padEnd(maxLength) +
+                       ' ';
+
+        let value = '';
+        if (output[i].values.length === 1) {
+            value += output[i].values[0];
+        } else {
+            const subfields = hl7v271.fields[output[i].datatype]?.subfields;
+            let maxSubfieldDescLength = 0;
+            if (subfields) {
+                for (let j = 0; j < output[i].values.length; j++) {
+                    const desc = subfields[j]?.desc;
+                    if (desc) {
+                        maxSubfieldDescLength = Math.max(maxSubfieldDescLength, desc.length);
+                    }
+                }
+            }
+            for (let j = 0; j < output[i].values.length; j++) {
+                const subfieldDesc = subfields?.[j]?.desc || '';
+                value += ('\n  ' + output[i].segment + '.' + (j + 1) + ':').padEnd(prefix.length + 1);
+                if (maxSubfieldDescLength > 0) {
+                    value += (subfieldDesc + ':').padEnd(maxSubfieldDescLength + 1) + ' ';
+                }
+                value += output[i].values[j];
+            }
+        }
+
+        channelOutput += prefix + value + '\n';
+    }
+
+    return channelOutput;
+}
+
 function activate(context) {
     console.log('HL7 Extension is now active');
     let genCount = 0;
+    let tokenDoc = null;
 
     const filterSegmentCommand = vscode.commands.registerCommand('extension.filterSegment', () => {
         const editor = vscode.window.activeTextEditor;
@@ -42,93 +118,106 @@ function activate(context) {
 
     context.subscriptions.push(filterSegmentCommand);
 
+    function showTokenOutput(channelOutput) {
+        const showTokenDoc = (doc) => {
+            tokenDoc = doc;
+            return vscode.window.showTextDocument(doc, vscode.ViewColumn.Two, true);
+        };
+
+        if (tokenDoc && !tokenDoc.isClosed) {
+            vscode.window.showTextDocument(tokenDoc, vscode.ViewColumn.Two, true).then(e => {
+                e.edit(edit => {
+                    const fullRange = new vscode.Range(
+                        tokenDoc.positionAt(0),
+                        tokenDoc.positionAt(tokenDoc.getText().length)
+                    );
+                    edit.replace(fullRange, channelOutput);
+                });
+            });
+        } else {
+            vscode.workspace.openTextDocument({ content: channelOutput, language: 'plaintext' }).then(showTokenDoc);
+        }
+    }
+
     const tokenizeLineCommand = vscode.commands.registerCommand('extension.tokenizeLine', () => {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
             return;
         }
 
-        const currentDoc = editor.document;
-        const currentLineNum = editor.selection.start.line;
-        const tokens = currentDoc.lineAt(currentLineNum).text.split('|');
-        const segment = tokens[0];
-        const segmentDef = hl7v271.segments[segment];
-
-        if (!segmentDef) {
+        const channelOutput = tokenizeLine(editor.document, editor.selection.start.line);
+        if (!channelOutput) {
+            const segment = editor.document.lineAt(editor.selection.start.line).text.split('|')[0];
             vscode.window.showErrorMessage(`Unknown segment: ${segment}`);
             return;
         }
 
-        if (segment === 'MSH') {
-            tokens.splice(1, 0, '|');
-        }
-
-        const output = [{ segment: segment + '-0', desc: segment, values: [segment] }];
-        let maxLength = 0;
-        for (let i = 1; i <= segmentDef.fields.length; i++) {
-            const desc = segmentDef.fields[i - 1].desc;
-            maxLength = Math.max(maxLength, desc.length);
-
-            const values = [];
-            if (i < tokens.length) {
-                if (segment === 'MSH' && i === 2) {
-                    values.push(tokens[i]);
-                } else {
-                    const subTokens = tokens[i].split('^');
-                    for (let j = 0; j < subTokens.length; j++) {
-                        values.push(subTokens[j]);
-                    }
-                }
-            }
-
-            output.push({
-                segment: segment + '-' + i,
-                desc: desc,
-                datatype: segmentDef.fields[i - 1].datatype,
-                values: values
-            });
-        }
-
-        let channelOutput = '';
-        for (let i = 0; i < output.length; i++) {
-            const prefix = (output[i].segment + ':').padEnd(8) +
-                           (output[i].desc + ':').padEnd(maxLength) +
-                           ' ';
-
-            let value = '';
-            if (output[i].values.length === 1) {
-                value += output[i].values[0];
-            } else {
-                const subfields = hl7v271.fields[output[i].datatype]?.subfields;
-                let maxSubfieldDescLength = 0;
-                if (subfields) {
-                    for (let j = 0; j < output[i].values.length; j++) {
-                        const desc = subfields[j]?.desc;
-                        if (desc) {
-                            maxSubfieldDescLength = Math.max(maxSubfieldDescLength, desc.length);
-                        }
-                    }
-                }
-                for (let j = 0; j < output[i].values.length; j++) {
-                    const subfieldDesc = subfields?.[j]?.desc || '';
-                    value += ('\n  ' + output[i].segment + '.' + (j + 1) + ':').padEnd(prefix.length + 1);
-                    if (maxSubfieldDescLength > 0) {
-                        value += (subfieldDesc + ':').padEnd(maxSubfieldDescLength + 1) + ' ';
-                    }
-                    value += output[i].values[j];
-                }
-            }
-
-            channelOutput += prefix + value + '\n';
-        }
-
-        const channel = vscode.window.createOutputChannel('HL7 Tokens');
-        channel.clear();
-        channel.appendLine(channelOutput);
-        channel.show(vscode.ViewColumn.Two);
+        showTokenOutput(channelOutput);
     });
 
     context.subscriptions.push(tokenizeLineCommand);
+
+    let autoTokenizeEnabled = false;
+    let autoTokenizeListener = null;
+    let lastTokenizedLine = -1;
+    const autoTokenizeStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+    autoTokenizeStatusBar.command = 'extension.toggleAutoTokenize';
+    context.subscriptions.push(autoTokenizeStatusBar);
+
+    function updateStatusBar() {
+        if (autoTokenizeEnabled) {
+            autoTokenizeStatusBar.text = 'HL7 Auto-Tokenize: ON';
+            autoTokenizeStatusBar.show();
+        } else {
+            autoTokenizeStatusBar.text = 'HL7 Auto-Tokenize: OFF';
+            autoTokenizeStatusBar.hide();
+        }
+    }
+
+    const toggleAutoTokenizeCommand = vscode.commands.registerCommand('extension.toggleAutoTokenize', () => {
+        autoTokenizeEnabled = !autoTokenizeEnabled;
+        updateStatusBar();
+
+        if (autoTokenizeEnabled) {
+            lastTokenizedLine = -1;
+            autoTokenizeListener = vscode.window.onDidChangeTextEditorSelection((e) => {
+                if (e.textEditor.document.languageId !== 'hl7') {
+                    return;
+                }
+
+                const lineNum = e.selections[0].start.line;
+                if (lineNum === lastTokenizedLine) {
+                    return;
+                }
+
+                lastTokenizedLine = lineNum;
+                const channelOutput = tokenizeLine(e.textEditor.document, lineNum);
+                if (channelOutput) {
+                    showTokenOutput(channelOutput);
+                }
+            });
+            context.subscriptions.push(autoTokenizeListener);
+
+            // Tokenize current line immediately
+            const editor = vscode.window.activeTextEditor;
+            if (editor && editor.document.languageId === 'hl7') {
+                const lineNum = editor.selection.start.line;
+                lastTokenizedLine = lineNum;
+                const channelOutput = tokenizeLine(editor.document, lineNum);
+                if (channelOutput) {
+                    showTokenOutput(channelOutput);
+                }
+            }
+        } else {
+            if (autoTokenizeListener) {
+                autoTokenizeListener.dispose();
+                autoTokenizeListener = null;
+            }
+            lastTokenizedLine = -1;
+        }
+    });
+
+    context.subscriptions.push(toggleAutoTokenizeCommand);
 
     const hoverProvider = vscode.languages.registerHoverProvider('hl7', {
         provideHover(document, position) {

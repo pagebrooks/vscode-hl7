@@ -1,9 +1,11 @@
 *.hl7
+*.vsix
 test
 images/filter_segment.png
 images/syntax.png
 images/tokenize_line.png
 node_modules
+modules/hl7-dictionary/.git
 modules/hl7-dictionary/dist
 modules/hl7-dictionary/gulpfile.js
 modules/hl7-dictionary/README.md
@@ -11,8 +13,9 @@ modules/hl7-dictionary/LICENSE.md
 modules/hl7-dictionary/.gitignore
 modules/hl7-dictionary/.npmignore
 .claude
-.vscode
+.git
 .gitmodules
+.vscode
 vsc-extension-quickstart.md
 jsconfig.json
 typings

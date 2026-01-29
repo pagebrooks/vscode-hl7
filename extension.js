@@ -14,6 +14,12 @@ function activate(context) {
         const currentDoc = editor.document;
         const currentLineNum = editor.selection.start.line;
         const segment = currentDoc.lineAt(currentLineNum).text.split('|')[0];
+
+        if (!segment) {
+            vscode.window.showErrorMessage('No segment found on current line.');
+            return;
+        }
+
         genCount++;
         const f = vscode.Uri.parse('untitled:' + segment + '-segments_' + genCount + '.hl7');
         vscode.workspace.openTextDocument(f).then((doc) => {
@@ -47,6 +53,11 @@ function activate(context) {
         const tokens = currentDoc.lineAt(currentLineNum).text.split('|');
         const segment = tokens[0];
         const segmentDef = hl7v271.segments[segment];
+
+        if (!segmentDef) {
+            vscode.window.showErrorMessage(`Unknown segment: ${segment}`);
+            return;
+        }
 
         if (segment === 'MSH') {
             tokens.splice(1, 0, '|');
@@ -118,6 +129,84 @@ function activate(context) {
     });
 
     context.subscriptions.push(tokenizeLineCommand);
+
+    const hoverProvider = vscode.languages.registerHoverProvider('hl7', {
+        provideHover(document, position) {
+            const line = document.lineAt(position.line).text;
+            if (!line) return null;
+
+            const tokens = line.split('|');
+            const segment = tokens[0];
+            const segmentDef = hl7v271.segments[segment];
+            if (!segmentDef) return null;
+
+            // Walk pipe-delimited tokens to find which field the cursor is in
+            let charOffset = tokens[0].length; // end of segment name
+            let fieldIndex = -1;
+            let fieldStart = 0;
+
+            for (let i = 1; i < tokens.length; i++) {
+                // charOffset is now at the pipe before token i
+                if (position.character <= charOffset) break; // cursor on or before pipe
+                fieldStart = charOffset + 1; // start of token content
+                charOffset += 1 + tokens[i].length; // pipe + token content
+                if (position.character < charOffset || i === tokens.length - 1) {
+                    fieldIndex = i;
+                    break;
+                }
+            }
+
+            if (fieldIndex < 1) return null; // cursor on segment name or a pipe
+
+            // Map token index to HL7 field number and definition index
+            // MSH: field 1 = '|' (separator), field 2 = encoding chars ('^~\&')
+            // After split('|'), tokens[1] = encoding chars = MSH-2
+            // So for MSH: fieldNumber = tokenIndex + 1
+            // For others: fieldNumber = tokenIndex
+            const fieldNumber = (segment === 'MSH') ? fieldIndex + 1 : fieldIndex;
+            const defIndex = fieldNumber - 1;
+
+            if (defIndex < 0 || defIndex >= segmentDef.fields.length) return null;
+
+            const fieldDef = segmentDef.fields[defIndex];
+            const fieldContent = tokens[fieldIndex];
+
+            const md = new vscode.MarkdownString();
+            md.appendMarkdown(`**${segment}-${fieldNumber}**: ${fieldDef.desc}\n\n`);
+            md.appendMarkdown(`**Type**: \`${fieldDef.datatype}\`\n\n`);
+
+            // Determine which ^-delimited component the cursor is in
+            const components = fieldContent.split('^');
+            if (components.length > 1) {
+                let compOffset = fieldStart;
+                let compIndex = 0;
+                for (let j = 0; j < components.length; j++) {
+                    if (position.character < compOffset + components[j].length) {
+                        compIndex = j;
+                        break;
+                    }
+                    compOffset += components[j].length + 1; // +1 for ^
+                    compIndex = j + 1;
+                }
+                if (compIndex >= components.length) compIndex = components.length - 1;
+
+                const subfieldDefs = hl7v271.fields[fieldDef.datatype]?.subfields;
+                if (subfieldDefs) {
+                    components.forEach((comp, idx) => {
+                        const sf = subfieldDefs[idx];
+                        const label = sf ? sf.desc : `Component ${idx + 1}`;
+                        const prefix = (idx === compIndex) ? '**' : '';
+                        const suffix = (idx === compIndex) ? '**' : '';
+                        const value = comp || '*(empty)*';
+                        md.appendMarkdown(`${prefix}${segment}-${fieldNumber}.${idx + 1} ${label}${suffix}: ${value}\n\n`);
+                    });
+                }
+            }
+
+            return new vscode.Hover(md);
+        }
+    });
+    context.subscriptions.push(hoverProvider);
 }
 
 exports.activate = activate;

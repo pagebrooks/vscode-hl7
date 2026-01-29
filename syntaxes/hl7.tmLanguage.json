@@ -1,0 +1,41 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"fileTypes": ["hl7"],
+	"name": "HL7",
+	"scopeName": "text.hl7",
+	"uuid": "263b608e-ed0c-496a-82db-35d1a6065fd7",
+	"patterns": [
+		{
+			"match": "^(.*?)(\\|)",
+			"captures": {
+				"1": { "name": "keyword.operator.hl7" },
+				"2": { "name": "constant.character.hl7" }
+			}
+		},
+		{
+			"match": "(\\^|&|~)",
+			"name": "string.other.hl7"
+		},
+		{
+			"begin": "(\\|)(ACK|ADT|BAR|BPS|BRP|BRT|BTS|CRM|CSU|DFT|EAC|EAN|EAR|EHC|ESR|ESU|INR|INU|LSR|LSU|MDM|MFN|NMD|NMQ|OMB|OMD|OMG|OMI|OML|OMN|OMP|OMS|OPL|OPR|OPU|ORB|ORD|ORF|ORG|ORI|ORL|ORM|ORN|ORP|ORR|OR|ORS|ORU|OSQ|OUL|PEX|PGL|PIN|PMU|PPG|PPP|PPR|PPT|PPV|PRR|PTR|QBP|QCN|QRY|QSB|QSX|QVR|RAR|RAS|RDE|RDS|RDY|REF|RER|RGR|RGV|ROR|RQA|RQC|RQI|RQP|RRA|RRD|RRE|RRG|RSP|RTB|SCN|SDN|SDR|SIU|SLN|SLR|SMD|SQM|SRM|SSR|SSU|STC|STI|SUR|TCR|TCU|VXQ|VXR|VXU|VXX)",
+			"beginCaptures": {
+				"1": { "name": "constant.character.hl7" },
+				"2": { "name": "support.function.hl7" }
+			},
+			"end": "(\\|)",
+			"name": "constant.character.hl7",
+			"patterns": [
+				{
+					"match": "(.*?)",
+					"captures": {
+						"1": { "name": "support.function.hl7" }
+					}
+				}
+			]
+		},
+		{
+			"match": "\\|",
+			"name": "constant.character.hl7"
+		}
+	]
+}

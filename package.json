@@ -44,7 +44,7 @@
             {
                 "language": "hl7",
                 "scopeName": "text.hl7",
-                "path": "./syntaxes/hl7.tmLanguage"
+                "path": "./syntaxes/hl7.tmLanguage.json"
             }
         ],
         "commands": [{

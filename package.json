@@ -2,14 +2,14 @@
     "name": "hl7",
     "displayName": "HL7",
     "description": "HL7 Language Support for Visual Studio Code",
-    "version": "0.0.12",
+    "version": "0.0.13",
     "publisher": "pbrooks",
     "icon": "images/hl7-icon.png",
     "galleryBanner": {
         "color": "#EAB8B4",
         "theme": "light"
     },
-    "license": "SEE LICENSE IN LICENSE.md",
+    "license": "SEE LICENSE IN LICENSE",
     "bugs": {
         "url": "https://github.com/pagebrooks/vscode-hl7/issues"
     },
@@ -19,17 +19,13 @@
         "url": "https://github.com/pagebrooks/vscode-hl7.git"
     },
     "engines": {
-        "vscode": "^0.10.x"
+        "vscode": "^1.75.0"
     },
     "categories": [
         "Languages",
         "Other"
     ],
-	"activationEvents": [
-		"onCommand:extension.filterSegment",
-        "onCommand:extension.tokenizeLine"
-	],
-	"main": "./extension",    
+	"main": "./extension",
     "contributes": {
         "languages": [
             {
@@ -59,7 +55,7 @@
             "title": "HL7: Tokenize Line"
         }]
     },
-    "devdependencies": {
-        "vscode": "0.10.x"
+    "devDependencies": {
+        "@types/vscode": "^1.75.0"
     }
 }

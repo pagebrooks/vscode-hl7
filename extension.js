@@ -1,17 +1,6 @@
 const vscode = require('vscode');
 const hl7v271 = require('./modules/hl7-dictionary').definitions['2.7.1'];
 
-function padRight(s, c, n) {
-    if (!s || !c || s.length >= n) {
-        return s;
-    }
-    const max = (n - s.length) / c.length;
-    for (let i = 0; i < max; i++) {
-        s += c;
-    }
-    return s;
-}
-
 function activate(context) {
     console.log('HL7 Extension is now active');
     let genCount = 0;
@@ -84,22 +73,37 @@ function activate(context) {
             output.push({
                 segment: segment + '-' + i,
                 desc: desc,
+                datatype: segmentDef.fields[i - 1].datatype,
                 values: values
             });
         }
 
         let channelOutput = '';
         for (let i = 0; i < output.length; i++) {
-            const prefix = padRight(output[i].segment + ':', ' ', 8) +
-                           padRight(output[i].desc + ':', ' ', maxLength) +
+            const prefix = (output[i].segment + ':').padEnd(8) +
+                           (output[i].desc + ':').padEnd(maxLength) +
                            ' ';
 
             let value = '';
             if (output[i].values.length === 1) {
                 value += output[i].values[0];
             } else {
+                const subfields = hl7v271.fields[output[i].datatype]?.subfields;
+                let maxSubfieldDescLength = 0;
+                if (subfields) {
+                    for (let j = 0; j < output[i].values.length; j++) {
+                        const desc = subfields[j]?.desc;
+                        if (desc) {
+                            maxSubfieldDescLength = Math.max(maxSubfieldDescLength, desc.length);
+                        }
+                    }
+                }
                 for (let j = 0; j < output[i].values.length; j++) {
-                    value += padRight('\n  ' + output[i].segment + '-' + j + ':', ' ', prefix.length + 1);
+                    const subfieldDesc = subfields?.[j]?.desc || '';
+                    value += ('\n  ' + output[i].segment + '.' + (j + 1) + ':').padEnd(prefix.length + 1);
+                    if (maxSubfieldDescLength > 0) {
+                        value += (subfieldDesc + ':').padEnd(maxSubfieldDescLength + 1) + ' ';
+                    }
                     value += output[i].values[j];
                 }
             }

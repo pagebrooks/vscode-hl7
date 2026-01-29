@@ -2,7 +2,7 @@
     "name": "hl7",
     "displayName": "HL7",
     "description": "HL7 Language Support for Visual Studio Code",
-    "version": "0.0.14",
+    "version": "0.0.16",
     "publisher": "pbrooks",
     "icon": "images/hl7-icon.png",
     "galleryBanner": {
@@ -22,8 +22,16 @@
         "vscode": "^1.75.0"
     },
     "categories": [
-        "Languages",
-        "Other"
+        "Languages"
+    ],
+    "keywords": [
+        "hl7",
+        "healthcare",
+        "medical",
+        "health-information-exchange"
+    ],
+    "activationEvents": [
+        "onLanguage:hl7"
     ],
 	"main": "./extension",
     "contributes": {

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.0.16
+
+- Added error messages for unrecognized segments in Tokenize Line and Filter Segment commands
+- Added `activationEvents` so the extension only loads when an HL7 file is opened
+- Added marketplace keywords for better discoverability
+- Removed inapplicable C-style comment definitions from language configuration
+- Reduced package size by excluding build artifacts and git metadata from bundle
+- Updated README
+
+## 0.0.15
+
+- Added hover provider for HL7 fields — hover over any part of an HL7 line to see field name, datatype, and component breakdown from the HL7 v2.7.1 dictionary
+
 ## 0.0.14
 
 - Added subfield descriptions to Tokenize Line output using HL7 dictionary datatype definitions

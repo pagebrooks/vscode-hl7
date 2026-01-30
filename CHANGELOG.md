@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.0.20
+- Add sponsor information
+
+## 0.0.19
+
+- Tokenize Line now opens in a reusable document tab instead of the output window, with content displayed from the top
+- Subsequent tokenize actions reuse the same tab rather than opening a new one each time
+- Added Auto-Tokenize mode — toggle with `HL7: Toggle Auto-Tokenize` to automatically tokenize each line as the cursor moves through a file
+- Status bar indicator shows when Auto-Tokenize is active
+
+## 0.0.18
+
+- Fix package deployment issues
+
+## 0.0.17
+
+- Fix package deployment issues
+
 ## 0.0.16
 
 - Added error messages for unrecognized segments in Tokenize Line and Filter Segment commands

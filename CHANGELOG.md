@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.0.20
+- Add sponsor information
+
 ## 0.0.19
 
 - Tokenize Line now opens in a reusable document tab instead of the output window, with content displayed from the top

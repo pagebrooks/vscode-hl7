@@ -2,6 +2,9 @@
 
 Field definitions and hover info use the HL7 v2.7.1 data dictionary. Messages from other v2.x versions will still get syntax highlighting, but field names and datatypes may not match exactly.
 
+## Support This Project
+If this extension is useful to you, consider [sponsoring its development](https://github.com/sponsors/pagebrooks).
+
 ## Features
 ### Syntax coloring
 * Segments and field separators are highlighted for easy interpretation.

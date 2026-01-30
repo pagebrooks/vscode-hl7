@@ -15,8 +15,14 @@ If this extension is useful to you, consider [sponsoring its development](https:
 * Move the cursor to a line that you wish to tokenize.
 * F1 -> HL7: Tokenize Line
 * Line will be split into fields with the ordinal and definition.
+* Output opens in a dedicated tab (starting from the top) that is reused on subsequent tokenize actions.
 
 ![Tokenize Line](images/tokenize_line.png)
+
+### Auto-Tokenize Mode
+* F1 -> HL7: Toggle Auto-Tokenize
+* When enabled, the current line is automatically tokenized as you move the cursor through the file — no need to re-run the command for each line.
+* A status bar indicator shows when Auto-Tokenize is active. Click it to toggle off.
 
 ### Field Hover Info
 * Hover over any field in an HL7 message to see its name, datatype, and component breakdown.

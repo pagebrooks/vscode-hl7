@@ -64,6 +64,9 @@
         },{
             "command": "extension.tokenizeLine",
             "title": "HL7: Tokenize Line"
+        },{
+            "command": "extension.toggleAutoTokenize",
+            "title": "HL7: Toggle Auto-Tokenize"
         }]
     },
     "devDependencies": {

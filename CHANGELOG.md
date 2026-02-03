@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.21
+- Improve documentation
+- Update Logo
+
 ## 0.0.20
 - Add sponsor information
 

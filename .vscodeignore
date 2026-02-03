@@ -3,9 +3,12 @@
 .PAT
 test
 test.hl7
+images/auto_tokenize_demo.gif
+images/field_hover.png
 images/filter_segment.png
 images/syntax.png
 images/tokenize_line.png
+images/hl7-icon.kra
 node_modules
 modules/hl7-dictionary/.git
 modules/hl7-dictionary/dist

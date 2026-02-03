@@ -5,7 +5,7 @@
          "url": "https://github.com/sponsors/pagebrooks"
     },
     "description": "HL7 Language Support for Visual Studio Code",
-    "version": "0.0.20",
+    "version": "0.0.21",
     "publisher": "pbrooks",
     "icon": "images/hl7-icon.png",
     "galleryBanner": {

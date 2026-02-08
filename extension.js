@@ -76,6 +76,72 @@ function tokenizeLine(document, lineNum) {
     return channelOutput;
 }
 
+function filterSegmentLines(text, segmentType) {
+    const lines = text.split('\n');
+    let output = '';
+    for (let i = 0; i < lines.length; i++) {
+        const currSeg = lines[i].split('|')[0];
+        if (segmentType === currSeg) {
+            output += lines[i] + '\n';
+        }
+    }
+    return output;
+}
+
+function getFieldInfo(line, charPosition) {
+    if (!line) return null;
+
+    const tokens = line.split('|');
+    const segment = tokens[0];
+    const segmentDef = hl7v271.segments[segment];
+    if (!segmentDef) return null;
+
+    // Walk pipe-delimited tokens to find which field the cursor is in
+    let charOffset = tokens[0].length; // end of segment name
+    let fieldIndex = -1;
+    let fieldStart = 0;
+
+    for (let i = 1; i < tokens.length; i++) {
+        // charOffset is now at the pipe before token i
+        if (charPosition <= charOffset) break; // cursor on or before pipe
+        fieldStart = charOffset + 1; // start of token content
+        charOffset += 1 + tokens[i].length; // pipe + token content
+        if (charPosition < charOffset || i === tokens.length - 1) {
+            fieldIndex = i;
+            break;
+        }
+    }
+
+    if (fieldIndex < 1) return null; // cursor on segment name or a pipe
+
+    // Map token index to HL7 field number and definition index
+    const fieldNumber = (segment === 'MSH') ? fieldIndex + 1 : fieldIndex;
+    const defIndex = fieldNumber - 1;
+
+    if (defIndex < 0 || defIndex >= segmentDef.fields.length) return null;
+
+    const fieldDef = segmentDef.fields[defIndex];
+    const fieldContent = tokens[fieldIndex];
+
+    // Determine which ^-delimited component the cursor is in
+    const components = fieldContent.split('^');
+    let componentIndex = 0;
+    if (components.length > 1) {
+        let compOffset = fieldStart;
+        for (let j = 0; j < components.length; j++) {
+            if (charPosition < compOffset + components[j].length) {
+                componentIndex = j;
+                break;
+            }
+            compOffset += components[j].length + 1; // +1 for ^
+            componentIndex = j + 1;
+        }
+        if (componentIndex >= components.length) componentIndex = components.length - 1;
+    }
+
+    return { segment, fieldNumber, defIndex, fieldDef, componentIndex, components };
+}
+
 function activate(context) {
     console.log('HL7 Extension is now active');
     let genCount = 0;
@@ -102,14 +168,7 @@ function activate(context) {
             return vscode.window.showTextDocument(doc).then((e) => {
                 let x = 0;
                 e.edit((te) => {
-                    let output = '';
-                    for (let i = 0; i < currentDoc.lineCount; i++) {
-                        const currLine = currentDoc.lineAt(i).text;
-                        const currSeg = currLine.split('|')[0];
-                        if (segment === currSeg) {
-                            output += currLine + '\n';
-                        }
-                    }
+                    const output = filterSegmentLines(currentDoc.getText(), segment);
                     te.insert(new vscode.Position(x++, 0), output);
                 });
             });
@@ -222,70 +281,23 @@ function activate(context) {
     const hoverProvider = vscode.languages.registerHoverProvider('hl7', {
         provideHover(document, position) {
             const line = document.lineAt(position.line).text;
-            if (!line) return null;
+            const info = getFieldInfo(line, position.character);
+            if (!info) return null;
 
-            const tokens = line.split('|');
-            const segment = tokens[0];
-            const segmentDef = hl7v271.segments[segment];
-            if (!segmentDef) return null;
-
-            // Walk pipe-delimited tokens to find which field the cursor is in
-            let charOffset = tokens[0].length; // end of segment name
-            let fieldIndex = -1;
-            let fieldStart = 0;
-
-            for (let i = 1; i < tokens.length; i++) {
-                // charOffset is now at the pipe before token i
-                if (position.character <= charOffset) break; // cursor on or before pipe
-                fieldStart = charOffset + 1; // start of token content
-                charOffset += 1 + tokens[i].length; // pipe + token content
-                if (position.character < charOffset || i === tokens.length - 1) {
-                    fieldIndex = i;
-                    break;
-                }
-            }
-
-            if (fieldIndex < 1) return null; // cursor on segment name or a pipe
-
-            // Map token index to HL7 field number and definition index
-            // MSH: field 1 = '|' (separator), field 2 = encoding chars ('^~\&')
-            // After split('|'), tokens[1] = encoding chars = MSH-2
-            // So for MSH: fieldNumber = tokenIndex + 1
-            // For others: fieldNumber = tokenIndex
-            const fieldNumber = (segment === 'MSH') ? fieldIndex + 1 : fieldIndex;
-            const defIndex = fieldNumber - 1;
-
-            if (defIndex < 0 || defIndex >= segmentDef.fields.length) return null;
-
-            const fieldDef = segmentDef.fields[defIndex];
-            const fieldContent = tokens[fieldIndex];
+            const { segment, fieldNumber, fieldDef, componentIndex, components } = info;
 
             const md = new vscode.MarkdownString();
             md.appendMarkdown(`**${segment}-${fieldNumber}**: ${fieldDef.desc}\n\n`);
             md.appendMarkdown(`**Type**: \`${fieldDef.datatype}\`\n\n`);
 
-            // Determine which ^-delimited component the cursor is in
-            const components = fieldContent.split('^');
             if (components.length > 1) {
-                let compOffset = fieldStart;
-                let compIndex = 0;
-                for (let j = 0; j < components.length; j++) {
-                    if (position.character < compOffset + components[j].length) {
-                        compIndex = j;
-                        break;
-                    }
-                    compOffset += components[j].length + 1; // +1 for ^
-                    compIndex = j + 1;
-                }
-                if (compIndex >= components.length) compIndex = components.length - 1;
-
                 const subfieldDefs = hl7v271.fields[fieldDef.datatype]?.subfields;
                 if (subfieldDefs) {
                     components.forEach((comp, idx) => {
                         const sf = subfieldDefs[idx];
                         const label = sf ? sf.desc : `Component ${idx + 1}`;
-                        const prefix = (idx === compIndex) ? '**' : '';
-                        const suffix = (idx === compIndex) ? '**' : '';
+                        const prefix = (idx === componentIndex) ? '**' : '';
+                        const suffix = (idx === componentIndex) ? '**' : '';
                         const value = comp || '*(empty)*';
                         md.appendMarkdown(`${prefix}${segment}-${fieldNumber}.${idx + 1} ${label}${suffix}: ${value}\n\n`);
                     });
@@ -299,3 +311,6 @@ function activate(context) {
 }
 
 exports.activate = activate;
+exports.tokenizeLine = tokenizeLine;
+exports.getFieldInfo = getFieldInfo;
+exports.filterSegmentLines = filterSegmentLines;

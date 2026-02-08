@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { tokenizeLine, getFieldInfo, filterSegmentLines } = require('../extension');
+const { tokenizeLine, getFieldInfo, getVersion, filterSegmentLines } = require('../extension');
 
 // Minimal document mock for tokenizeLine
 function mockDoc(lines) {
@@ -175,5 +175,55 @@ describe('filterSegmentLines', function () {
 
         // Only the first line matches since split('|')[0] of "MSH2|bad" is "MSH2"
         assert.strictEqual(result, 'MSH|^~\\&|App\n');
+    });
+});
+
+describe('getVersion', function () {
+    it('extracts version from MSH-12', function () {
+        const doc = mockDoc(['MSH|^~\\&|SendApp|SendFac|RecvApp|RecvFac|20230101||ADT^A01|123|P|2.5.1']);
+        assert.strictEqual(getVersion(doc), '2.5.1');
+    });
+
+    it('returns default version when MSH-12 is missing', function () {
+        const doc = mockDoc(['MSH|^~\\&|SendApp|SendFac']);
+        assert.strictEqual(getVersion(doc), '2.7.1');
+    });
+
+    it('returns default version for non-MSH first line', function () {
+        const doc = mockDoc(['PID|1||12345']);
+        assert.strictEqual(getVersion(doc), '2.7.1');
+    });
+
+    it('returns default version for unsupported version string', function () {
+        const doc = mockDoc(['MSH|^~\\&|SendApp|SendFac|RecvApp|RecvFac|20230101||ADT^A01|123|P|2.4']);
+        assert.strictEqual(getVersion(doc), '2.7.1');
+    });
+
+    it('handles composite version field (e.g. 2.5.1^USA)', function () {
+        const doc = mockDoc(['MSH|^~\\&|SendApp|SendFac|RecvApp|RecvFac|20230101||ADT^A01|123|P|2.5.1^USA']);
+        assert.strictEqual(getVersion(doc), '2.5.1');
+    });
+});
+
+describe('v2.5.1 support', function () {
+    it('tokenizeLine uses v2.5.1 definitions when MSH-12 is 2.5.1', function () {
+        const msh = 'MSH|^~\\&|SendApp|SendFac|RecvApp|RecvFac|20230101||ADT^A01|123|P|2.5.1';
+        const pid = 'PID|1||12345^^^MRN||Doe^John';
+        const doc = mockDoc([msh, pid]);
+        const result = tokenizeLine(doc, 1);
+
+        assert.ok(result, 'should return non-null output');
+        assert.ok(result.includes('PID-0:'), 'should include segment header');
+        assert.ok(result.includes('PID-1:'), 'should include PID-1');
+    });
+
+    it('getFieldInfo works with explicit v2.5.1 version', function () {
+        const line = 'PID|1||12345^^^MRN';
+        const result = getFieldInfo(line, 4, '2.5.1');
+
+        assert.ok(result, 'should return non-null');
+        assert.strictEqual(result.segment, 'PID');
+        assert.strictEqual(result.fieldNumber, 1);
+        assert.strictEqual(result.fieldDef.desc, 'Set ID - PID');
     });
 });

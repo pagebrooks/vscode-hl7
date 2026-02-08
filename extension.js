@@ -1,11 +1,37 @@
 const vscode = require('vscode');
-const segments = require('./data/segments.json');
-const fields = require('./data/fields.json');
+
+const definitions = {
+    '2.5.1': {
+        segments: require('./data/2.5.1/segments.json'),
+        fields: require('./data/2.5.1/fields.json'),
+    },
+    '2.7.1': {
+        segments: require('./data/2.7.1/segments.json'),
+        fields: require('./data/2.7.1/fields.json'),
+    },
+};
+
+const DEFAULT_VERSION = '2.7.1';
+
+function getDefs(version) {
+    return definitions[version] || definitions[DEFAULT_VERSION];
+}
+
+function getVersion(document) {
+    const firstLine = document.lineAt(0).text;
+    const tokens = firstLine.split('|');
+    if (tokens[0] !== 'MSH') return DEFAULT_VERSION;
+    // MSH-12 (Version ID) is at token index 11; take first component
+    const version = (tokens[11] || '').split('^')[0];
+    return definitions[version] ? version : DEFAULT_VERSION;
+}
 
 function tokenizeLine(document, lineNum) {
+    const version = getVersion(document);
+    const defs = getDefs(version);
     const tokens = document.lineAt(lineNum).text.split('|');
     const segment = tokens[0];
-    const segmentDef = segments[segment];
+    const segmentDef = defs.segments[segment];
 
     if (!segmentDef) {
         return null;
@@ -51,7 +77,7 @@ function tokenizeLine(document, lineNum) {
         if (output[i].values.length === 1) {
             value += output[i].values[0];
         } else {
-            const subfields = fields[output[i].datatype]?.subfields;
+            const subfields = defs.fields[output[i].datatype]?.subfields;
             let maxSubfieldDescLength = 0;
             if (subfields) {
                 for (let j = 0; j < output[i].values.length; j++) {
@@ -89,12 +115,13 @@ function filterSegmentLines(text, segmentType) {
     return output;
 }
 
-function getFieldInfo(line, charPosition) {
+function getFieldInfo(line, charPosition, version) {
     if (!line) return null;
 
+    const defs = getDefs(version);
     const tokens = line.split('|');
     const segment = tokens[0];
-    const segmentDef = segments[segment];
+    const segmentDef = defs.segments[segment];
     if (!segmentDef) return null;
 
     // Walk pipe-delimited tokens to find which field the cursor is in
@@ -281,8 +308,10 @@ function activate(context) {
 
     const hoverProvider = vscode.languages.registerHoverProvider('hl7', {
         provideHover(document, position) {
+            const version = getVersion(document);
+            const defs = getDefs(version);
             const line = document.lineAt(position.line).text;
-            const info = getFieldInfo(line, position.character);
+            const info = getFieldInfo(line, position.character, version);
             if (!info) return null;
 
             const { segment, fieldNumber, fieldDef, componentIndex, components } = info;
@@ -292,7 +321,7 @@ function activate(context) {
             md.appendMarkdown(`**Type**: \`${fieldDef.datatype}\`\n\n`);
 
             if (components.length > 1) {
-                const subfieldDefs = fields[fieldDef.datatype]?.subfields;
+                const subfieldDefs = defs.fields[fieldDef.datatype]?.subfields;
                 if (subfieldDefs) {
                     components.forEach((comp, idx) => {
                         const sf = subfieldDefs[idx];
@@ -314,4 +343,5 @@ function activate(context) {
 exports.activate = activate;
 exports.tokenizeLine = tokenizeLine;
 exports.getFieldInfo = getFieldInfo;
+exports.getVersion = getVersion;
 exports.filterSegmentLines = filterSegmentLines;

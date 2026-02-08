@@ -69,7 +69,11 @@
             "title": "HL7: Toggle Auto-Tokenize"
         }]
     },
+    "scripts": {
+        "test": "mocha --require test/setup.js test/**/*.test.js"
+    },
     "devDependencies": {
-        "@types/vscode": "^1.75.0"
+        "@types/vscode": "^1.75.0",
+        "mocha": "^10.2.0"
     }
 }

@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { tokenizeLine, getFieldInfo, getVersion, filterSegmentLines } = require('../extension');
+const { tokenizeLine, getFieldInfo, getVersion, getSegmentCounts, filterSegmentLines } = require('../extension');
 
 // Minimal document mock for tokenizeLine
 function mockDoc(lines) {
@@ -225,5 +225,32 @@ describe('v2.5.1 support', function () {
         assert.strictEqual(result.segment, 'PID');
         assert.strictEqual(result.fieldNumber, 1);
         assert.strictEqual(result.fieldDef.desc, 'Set ID - PID');
+    });
+});
+
+describe('getSegmentCounts', function () {
+    it('counts segments in a multi-line message', function () {
+        const text = 'MSH|^~\\&|App\nPID|1||123\nOBR|1\nOBX|1|ST|code\nOBX|2|ST|code2';
+        const counts = getSegmentCounts(text);
+
+        assert.strictEqual(counts['MSH'], 1);
+        assert.strictEqual(counts['PID'], 1);
+        assert.strictEqual(counts['OBR'], 1);
+        assert.strictEqual(counts['OBX'], 2);
+        assert.strictEqual(Object.keys(counts).length, 4);
+    });
+
+    it('ignores blank lines and non-segment content', function () {
+        const text = 'MSH|^~\\&|App\n\nPID|1||123\n';
+        const counts = getSegmentCounts(text);
+
+        assert.strictEqual(counts['MSH'], 1);
+        assert.strictEqual(counts['PID'], 1);
+        assert.strictEqual(Object.keys(counts).length, 2);
+    });
+
+    it('returns empty object for empty text', function () {
+        const counts = getSegmentCounts('');
+        assert.deepStrictEqual(counts, {});
     });
 });

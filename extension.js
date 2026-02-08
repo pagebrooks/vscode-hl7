@@ -170,10 +170,50 @@ function getFieldInfo(line, charPosition, version) {
     return { segment, fieldNumber, defIndex, fieldDef, componentIndex, components };
 }
 
+function getSegmentCounts(text) {
+    const counts = {};
+    const lines = text.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+        const seg = lines[i].split('|')[0];
+        if (seg && /^[A-Z][A-Z0-9]{2}$/.test(seg)) {
+            counts[seg] = (counts[seg] || 0) + 1;
+        }
+    }
+    return counts;
+}
+
 function activate(context) {
     console.log('HL7 Extension is now active');
     let genCount = 0;
     let tokenDoc = null;
+
+    // Segment count + version status bar
+    const segCountStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
+    context.subscriptions.push(segCountStatusBar);
+
+    function updateSegCountStatusBar(document) {
+        if (!document || document.languageId !== 'hl7') {
+            segCountStatusBar.hide();
+            return;
+        }
+        const counts = getSegmentCounts(document.getText());
+        const total = Object.values(counts).reduce((a, b) => a + b, 0);
+        const types = Object.keys(counts).length;
+        const version = getVersion(document);
+        segCountStatusBar.text = `HL7 v${version} | ${total} segments (${types} types)`;
+        segCountStatusBar.tooltip = Object.entries(counts).map(([k, v]) => `${k}: ${v}`).join('\n');
+        segCountStatusBar.show();
+    }
+
+    updateSegCountStatusBar(vscode.window.activeTextEditor?.document);
+    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor((editor) => {
+        updateSegCountStatusBar(editor?.document);
+    }));
+    context.subscriptions.push(vscode.workspace.onDidChangeTextDocument((e) => {
+        if (vscode.window.activeTextEditor?.document === e.document) {
+            updateSegCountStatusBar(e.document);
+        }
+    }));
 
     const filterSegmentCommand = vscode.commands.registerCommand('extension.filterSegment', () => {
         const editor = vscode.window.activeTextEditor;
@@ -344,4 +384,5 @@ exports.activate = activate;
 exports.tokenizeLine = tokenizeLine;
 exports.getFieldInfo = getFieldInfo;
 exports.getVersion = getVersion;
+exports.getSegmentCounts = getSegmentCounts;
 exports.filterSegmentLines = filterSegmentLines;

@@ -1,3 +1,0 @@
-[submodule "modules/hl7-dictionary"]
-	path = modules/hl7-dictionary
-	url = git@github.com:fernandojsg/hl7-dictionary.git

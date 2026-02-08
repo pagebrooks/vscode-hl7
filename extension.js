@@ -1,10 +1,11 @@
 const vscode = require('vscode');
-const hl7v271 = require('./modules/hl7-dictionary').definitions['2.7.1'];
+const segments = require('./data/segments.json');
+const fields = require('./data/fields.json');
 
 function tokenizeLine(document, lineNum) {
     const tokens = document.lineAt(lineNum).text.split('|');
     const segment = tokens[0];
-    const segmentDef = hl7v271.segments[segment];
+    const segmentDef = segments[segment];
 
     if (!segmentDef) {
         return null;
@@ -50,7 +51,7 @@ function tokenizeLine(document, lineNum) {
         if (output[i].values.length === 1) {
             value += output[i].values[0];
         } else {
-            const subfields = hl7v271.fields[output[i].datatype]?.subfields;
+            const subfields = fields[output[i].datatype]?.subfields;
             let maxSubfieldDescLength = 0;
             if (subfields) {
                 for (let j = 0; j < output[i].values.length; j++) {
@@ -93,7 +94,7 @@ function getFieldInfo(line, charPosition) {
 
     const tokens = line.split('|');
     const segment = tokens[0];
-    const segmentDef = hl7v271.segments[segment];
+    const segmentDef = segments[segment];
     if (!segmentDef) return null;
 
     // Walk pipe-delimited tokens to find which field the cursor is in
@@ -291,7 +292,7 @@ function activate(context) {
             md.appendMarkdown(`**Type**: \`${fieldDef.datatype}\`\n\n`);
 
             if (components.length > 1) {
-                const subfieldDefs = hl7v271.fields[fieldDef.datatype]?.subfields;
+                const subfieldDefs = fields[fieldDef.datatype]?.subfields;
                 if (subfieldDefs) {
                     components.forEach((comp, idx) => {
                         const sf = subfieldDefs[idx];

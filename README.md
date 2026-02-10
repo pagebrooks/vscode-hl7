@@ -69,7 +69,7 @@ Field definitions and hover info use the HL7 v2.5.1 and v2.7.1 data dictionaries
 ### Context Menu
 * Right-click in an HL7 file to access **Filter Segment**, **Tokenize Line**, and **Copy Field Path** directly from the context menu.
 
-![Filter Segment](images/context_menu.png)
+![Context Menu](images/context_menu.png)
 
 ## Commands
 

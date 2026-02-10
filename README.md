@@ -6,7 +6,7 @@
 
 Syntax highlighting, field tokenization, and hover info for HL7 v2.x messages in Visual Studio Code.
 
-Field definitions and hover info use the HL7 v2.7.1 data dictionary. Messages from other v2.x versions will still get syntax highlighting, but field names and datatypes may not match exactly.
+Field definitions and hover info use the HL7 v2.5.1 and v2.7.1 data dictionaries (auto-detected from MSH-12). Messages from other v2.x versions will still get syntax highlighting, but field names and datatypes may not match exactly.
 
 ## Features
 ### Syntax coloring
@@ -51,6 +51,25 @@ Field definitions and hover info use the HL7 v2.7.1 data dictionary. Messages fr
 
 ![Filter Segment](images/filter_segment.png)
 
+### Copy Field Path
+* Place the cursor on any field or component in an HL7 message.
+* Right-click -> HL7: Copy Field Path (or F1 -> HL7: Copy Field Path)
+* Copies the HL7 path (e.g. `PID-3.1` or `PID-1`) to the clipboard.
+
+### MLLP Send & Receive
+* **Send Message**: F1 -> HL7: Send Message — sends the current file (or selection) to an MLLP endpoint and displays the ACK response.
+* **Start Listener**: F1 -> HL7: Start MLLP Listener — starts a local MLLP server that receives messages and opens each one in a new editor tab.
+* **Stop Listener**: F1 -> HL7: Stop MLLP Listener — stops the running listener.
+* Default host and port are configurable via `hl7.mllp.host` and `hl7.mllp.port` settings.
+
+### Segment Count & Version Status Bar
+* The status bar displays the detected HL7 version and a count of segments in the current file (e.g. `HL7 v2.7.1 | 12 segments (5 types)`).
+* Hover over it to see a breakdown by segment type.
+
+### Context Menu
+* Right-click in an HL7 file to access **Filter Segment**, **Tokenize Line**, and **Copy Field Path** directly from the context menu.
+
+![Filter Segment](images/context_menu.png)
 
 ## Commands
 
@@ -59,6 +78,10 @@ Field definitions and hover info use the HL7 v2.7.1 data dictionary. Messages fr
 | `HL7: Tokenize Line`         | Split the current line into fields with ordinals and definitions |
 | `HL7: Toggle Auto-Tokenize`  | Automatically tokenize each line as the cursor moves         |
 | `HL7: Filter Segment`        | Create a new file containing only matching segment types     |
+| `HL7: Copy Field Path`       | Copy the HL7 field path at the cursor to the clipboard       |
+| `HL7: Send Message`          | Send the current message to an MLLP endpoint                 |
+| `HL7: Start MLLP Listener`   | Start a local MLLP listener to receive messages              |
+| `HL7: Stop MLLP Listener`    | Stop the running MLLP listener                               |
 
 ## Installation
 ### Visual Studio Code

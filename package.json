@@ -29,8 +29,10 @@
     ],
     "keywords": [
         "hl7",
+        "health level 7",
         "healthcare",
         "medical",
+        "interoperability",
         "health-information-exchange"
     ],
     "activationEvents": [

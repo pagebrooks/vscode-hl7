@@ -20,6 +20,15 @@ Field definitions and hover info use the HL7 v2.7.1 data dictionary. Messages fr
 
 ![Field Hover](images/field_hover.png)
 
+### Field Level Highlighting
+  * Place your cursor on any segment name (e.g., `OBX`) to highlight every occurrence
+  of that segment across the message.
+  * Place your cursor on a field or component to highlight the same field path on all
+  matching segment lines — useful for comparing values like `OBX-5` across multiple
+  observations or `PID-5.2` (Given Name) across patient records.
+
+![Field Highlight](images/field_highlight.png)
+
 ### Tokenize Line Command
 * Move the cursor to a line that you wish to tokenize.
 * F1 -> HL7: Tokenize Line

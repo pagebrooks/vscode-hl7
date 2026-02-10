@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { tokenizeLine, getFieldInfo, getVersion, getSegmentCounts, filterSegmentLines } = require('../extension');
+const { tokenizeLine, getFieldInfo, getVersion, getSegmentCounts, filterSegmentLines, getFieldRange, buildAck } = require('../extension');
 
 // Minimal document mock for tokenizeLine
 function mockDoc(lines) {
@@ -252,5 +252,104 @@ describe('getSegmentCounts', function () {
     it('returns empty object for empty text', function () {
         const counts = getSegmentCounts('');
         assert.deepStrictEqual(counts, {});
+    });
+});
+
+describe('getFieldRange', function () {
+    it('returns correct range for a PID field', function () {
+        // PID|1||12345
+        // Field 3 (12345) starts at index 7, length 5
+        const result = getFieldRange('PID|1||12345', 'PID', 3, null);
+        assert.deepStrictEqual(result, { start: 7, end: 12 });
+    });
+
+    it('handles MSH offset (fieldNumber - 1 = tokenIndex)', function () {
+        // MSH|^~\&|SendApp|SendFac
+        // MSH-3 (SendApp) is tokenIndex 2, starts at index 9, length 7
+        const result = getFieldRange('MSH|^~\\&|SendApp|SendFac', 'MSH', 3, null);
+        assert.deepStrictEqual(result, { start: 9, end: 16 });
+    });
+
+    it('returns correct range for a specific component', function () {
+        // PID|1||12345^^^MRN||Doe^John^M
+        // PID-5 starts at index 20, components: Doe(20-22) ^ John(24-27) ^ M(29)
+        const result = getFieldRange('PID|1||12345^^^MRN||Doe^John^M', 'PID', 5, 1);
+        assert.deepStrictEqual(result, { start: 24, end: 28 });
+    });
+
+    it('returns null when componentIndex exceeds available components', function () {
+        const result = getFieldRange('PID|1||12345', 'PID', 3, 2);
+        assert.strictEqual(result, null);
+    });
+
+    it('returns null when segment does not match', function () {
+        const result = getFieldRange('OBX|1|ST|code', 'PID', 1, null);
+        assert.strictEqual(result, null);
+    });
+
+    it('returns null when fieldNumber exceeds tokens', function () {
+        const result = getFieldRange('PID|1', 'PID', 5, null);
+        assert.strictEqual(result, null);
+    });
+
+    it('returns whole field when componentIndex is null and field has components', function () {
+        // PID|1||12345^^^MRN||Doe^John^M
+        // PID-5 whole field: Doe^John^M starts at 20, length 10
+        const result = getFieldRange('PID|1||12345^^^MRN||Doe^John^M', 'PID', 5, null);
+        assert.deepStrictEqual(result, { start: 20, end: 30 });
+    });
+});
+
+describe('buildAck', function () {
+    it('swaps sending and receiving application/facility', function () {
+        const msg = 'MSH|^~\\&|SendApp|SendFac|RecvApp|RecvFac|20240101120000||ADT^A01|CTRL1|P|2.5.1\rPID|||123';
+        const ack = buildAck(msg);
+        const fields = ack.split('\r')[0].split('|');
+
+        assert.strictEqual(fields[2], 'RecvApp');
+        assert.strictEqual(fields[3], 'RecvFac');
+        assert.strictEqual(fields[4], 'SendApp');
+        assert.strictEqual(fields[5], 'SendFac');
+    });
+
+    it('preserves control ID in MSH-10 and MSA-2', function () {
+        const msg = 'MSH|^~\\&|S|SF|R|RF|20240101||ADT^A01|MSG999|P|2.7.1\rPID|||123';
+        const ack = buildAck(msg);
+        const segments = ack.split('\r');
+        const mshFields = segments[0].split('|');
+        const msaFields = segments[1].split('|');
+
+        assert.strictEqual(mshFields[9], 'MSG999');
+        assert.strictEqual(msaFields[2], 'MSG999');
+    });
+
+    it('sets message type to ACK and MSA-1 to AA', function () {
+        const msg = 'MSH|^~\\&|S|SF|R|RF|20240101||ADT^A01|1|P|2.5.1';
+        const ack = buildAck(msg);
+        const segments = ack.split('\r');
+        const mshFields = segments[0].split('|');
+        const msaFields = segments[1].split('|');
+
+        assert.strictEqual(mshFields[8], 'ACK');
+        assert.strictEqual(msaFields[0], 'MSA');
+        assert.strictEqual(msaFields[1], 'AA');
+    });
+
+    it('preserves HL7 version from original message', function () {
+        const msg = 'MSH|^~\\&|S|SF|R|RF|20240101||ADT^A01|1|P|2.7.1';
+        const ack = buildAck(msg);
+        const fields = ack.split('\r')[0].split('|');
+
+        assert.strictEqual(fields[11], '2.7.1');
+    });
+
+    it('handles missing optional MSH fields gracefully', function () {
+        const msg = 'MSH|^~\\&|||||||ADT^A01|CTRL1|P|2.5.1';
+        const ack = buildAck(msg);
+        const segments = ack.split('\r');
+
+        assert.strictEqual(segments.length, 2);
+        assert.ok(segments[0].startsWith('MSH|'));
+        assert.ok(segments[1].startsWith('MSA|AA|'));
     });
 });

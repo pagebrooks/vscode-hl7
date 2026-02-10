@@ -5,7 +5,7 @@
          "url": "https://github.com/sponsors/pagebrooks"
     },
     "description": "HL7 Language Support for Visual Studio Code",
-    "version": "0.0.21",
+    "version": "0.0.22",
     "publisher": "pbrooks",
     "icon": "images/hl7-icon.png",
     "galleryBanner": {
@@ -25,12 +25,16 @@
         "vscode": "^1.75.0"
     },
     "categories": [
-        "Languages"
+        "Languages",
+        "Formatters",
+        "Other"
     ],
     "keywords": [
         "hl7",
+        "health level 7",
         "healthcare",
         "medical",
+        "interoperability",
         "health-information-exchange"
     ],
     "activationEvents": [
@@ -67,7 +71,49 @@
         },{
             "command": "extension.toggleAutoTokenize",
             "title": "HL7: Toggle Auto-Tokenize"
-        }]
+        },{
+            "command": "extension.sendMessage",
+            "title": "HL7: Send Message"
+        },{
+            "command": "extension.startListener",
+            "title": "HL7: Start MLLP Listener"
+        },{
+            "command": "extension.stopListener",
+            "title": "HL7: Stop MLLP Listener"
+        },{
+            "command": "extension.copyFieldPath",
+            "title": "HL7: Copy Field Path"
+        }],
+        "menus": {
+            "editor/context": [{
+                "command": "extension.filterSegment",
+                "when": "editorLangId == hl7",
+                "group": "9_hl7"
+            },{
+                "command": "extension.tokenizeLine",
+                "when": "editorLangId == hl7",
+                "group": "9_hl7"
+            },{
+                "command": "extension.copyFieldPath",
+                "when": "editorLangId == hl7",
+                "group": "9_hl7"
+            }]
+        },
+        "configuration": {
+            "title": "HL7",
+            "properties": {
+                "hl7.mllp.host": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Default MLLP host"
+                },
+                "hl7.mllp.port": {
+                    "type": "number",
+                    "default": 2575,
+                    "description": "Default MLLP port"
+                }
+            }
+        }
     },
     "scripts": {
         "test": "mocha --require test/setup.js test/**/*.test.js"

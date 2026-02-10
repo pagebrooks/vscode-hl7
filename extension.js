@@ -1,4 +1,66 @@
 const vscode = require('vscode');
+const net = require('net');
+
+const SB = '\x0b';
+const EB = '\x1c';
+const CR = '\x0d';
+
+let mllpServer = null;
+let receivedCount = 0;
+
+function buildAck(message) {
+    const segments = message.split('\r');
+    const mshFields = segments[0].split('|');
+    const sendingApp = mshFields[2] || '';
+    const sendingFac = mshFields[3] || '';
+    const recvApp = mshFields[4] || '';
+    const recvFac = mshFields[5] || '';
+    const controlId = mshFields[9] || '';
+    const version = mshFields[11] || '2.5.1';
+    const now = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+    return [
+        `MSH|^~\\&|${recvApp}|${recvFac}|${sendingApp}|${sendingFac}|${now}||ACK|${controlId}|P|${version}`,
+        `MSA|AA|${controlId}`,
+    ].join('\r');
+}
+
+function sendMessage(host, port, hl7Text) {
+    return new Promise((resolve, reject) => {
+        const socket = new net.Socket();
+        let response = '';
+
+        socket.setTimeout(10000);
+
+        socket.connect(port, host, () => {
+            socket.write(SB + hl7Text + EB + CR);
+        });
+
+        socket.on('data', (data) => {
+            response += data.toString();
+            if (response.length > 1024 * 1024) {
+                socket.destroy();
+                reject(new Error('Response exceeded 1 MB limit'));
+                return;
+            }
+            if (response.includes(EB)) {
+                socket.destroy();
+                // Unwrap MLLP framing from response
+                const start = response.indexOf(SB);
+                const end = response.indexOf(EB);
+                resolve(response.substring(start === -1 ? 0 : start + 1, end));
+            }
+        });
+
+        socket.on('timeout', () => {
+            socket.destroy();
+            reject(new Error('Connection timed out after 10 seconds'));
+        });
+
+        socket.on('error', (err) => {
+            reject(err);
+        });
+    });
+}
 
 const definitions = {
     '2.5.1': {
@@ -182,8 +244,111 @@ function getSegmentCounts(text) {
     return counts;
 }
 
+function getFieldRange(lineText, segment, fieldNumber, componentIndex) {
+    const tokens = lineText.split('|');
+    if (tokens[0] !== segment) return null;
+
+    const tokenIndex = (segment === 'MSH') ? fieldNumber - 1 : fieldNumber;
+    if (tokenIndex < 1 || tokenIndex >= tokens.length) return null;
+
+    // Walk pipes to find the character offset of the target token
+    let charOffset = 0;
+    for (let i = 0; i < tokenIndex; i++) {
+        charOffset += tokens[i].length + 1; // +1 for pipe
+    }
+
+    const fieldContent = tokens[tokenIndex];
+    const components = fieldContent.split('^');
+
+    if (componentIndex != null) {
+        if (componentIndex >= components.length) return null;
+        if (components.length > 1) {
+            let compOffset = charOffset;
+            for (let j = 0; j < componentIndex; j++) {
+                compOffset += components[j].length + 1; // +1 for ^
+            }
+            return { start: compOffset, end: compOffset + components[componentIndex].length };
+        }
+    }
+
+    return { start: charOffset, end: charOffset + fieldContent.length };
+}
+
 function activate(context) {
     console.log('HL7 Extension is now active');
+
+    // Clean up stale listener port from a previous session that didn't deactivate cleanly
+    context.globalState.update('mllpListenerPort', undefined);
+
+    // Record install date and show a one-time rating prompt after 30 days
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+    if (!context.globalState.get('installDate')) {
+        context.globalState.update('installDate', Date.now());
+    }
+    const installDate = context.globalState.get('installDate');
+    if (installDate && Date.now() - installDate >= THIRTY_DAYS_MS && !context.globalState.get('ratingPromptShown')) {
+        context.globalState.update('ratingPromptShown', true);
+        const rateCommand = vscode.commands.registerCommand('extension.rateExtension', () => {
+            vscode.env.openExternal(vscode.Uri.parse('https://marketplace.visualstudio.com/items?itemName=pbrooks.hl7&ssr=false#review-details'));
+        });
+        const rateStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 0);
+        rateStatusBar.text = '$(star) Please rate my HL7 extension';
+        rateStatusBar.command = 'extension.rateExtension';
+        rateStatusBar.show();
+        context.subscriptions.push(rateCommand, rateStatusBar);
+    }
+
+    // Field highlighting — decorates matching fields across all lines
+    const fieldHighlight = vscode.window.createTextEditorDecorationType({
+        backgroundColor: new vscode.ThemeColor('editor.wordHighlightBackground'),
+        borderColor: new vscode.ThemeColor('editor.wordHighlightBorder'),
+    });
+    context.subscriptions.push(fieldHighlight);
+
+    function updateFieldHighlight(editor) {
+        if (!editor || editor.document.languageId !== 'hl7') {
+            editor?.setDecorations(fieldHighlight, []);
+            return;
+        }
+        const doc = editor.document;
+        const pos = editor.selection.active;
+        const line = doc.lineAt(pos.line).text;
+        const pipeIdx = line.indexOf('|');
+        const ranges = [];
+
+        if (pipeIdx === -1 || pos.character < pipeIdx) {
+            // Cursor is on segment name — highlight same segment on all lines
+            const segment = line.substring(0, pipeIdx === -1 ? line.length : pipeIdx);
+            if (!segment) { editor.setDecorations(fieldHighlight, []); return; }
+            for (let i = 0; i < doc.lineCount; i++) {
+                const l = doc.lineAt(i).text;
+                if (l.split('|')[0] === segment) {
+                    ranges.push(new vscode.Range(i, 0, i, segment.length));
+                }
+            }
+        } else {
+            const version = getVersion(doc);
+            const info = getFieldInfo(line, pos.character, version);
+            if (!info) { editor.setDecorations(fieldHighlight, []); return; }
+            const compIdx = info.components.length > 1 ? info.componentIndex : null;
+            for (let i = 0; i < doc.lineCount; i++) {
+                const r = getFieldRange(doc.lineAt(i).text, info.segment, info.fieldNumber, compIdx);
+                if (r) {
+                    ranges.push(new vscode.Range(i, r.start, i, r.end));
+                }
+            }
+        }
+        editor.setDecorations(fieldHighlight, ranges);
+    }
+
+    updateFieldHighlight(vscode.window.activeTextEditor);
+    context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection((e) => {
+        updateFieldHighlight(e.textEditor);
+    }));
+    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor((editor) => {
+        updateFieldHighlight(editor);
+    }));
+
     let genCount = 0;
     let tokenDoc = null;
 
@@ -346,6 +511,167 @@ function activate(context) {
 
     context.subscriptions.push(toggleAutoTokenizeCommand);
 
+    const mllpOutputChannel = vscode.window.createOutputChannel('HL7 MLLP');
+    context.subscriptions.push(mllpOutputChannel);
+
+    const sendMessageCommand = vscode.commands.registerCommand('extension.sendMessage', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            vscode.window.showErrorMessage('No active editor.');
+            return;
+        }
+
+        const selection = editor.selection;
+        let text = selection.isEmpty ? editor.document.getText() : editor.document.getText(selection);
+        text = text.replace(/\r\n/g, '\r').replace(/\n/g, '\r');
+
+        const config = vscode.workspace.getConfiguration('hl7.mllp');
+        const defaultHost = config.get('host') || '';
+        const defaultPort = config.get('port') || 0;
+
+        const host = await vscode.window.showInputBox({
+            prompt: 'MLLP Host',
+            value: defaultHost,
+            placeHolder: 'e.g. 127.0.0.1',
+        });
+        if (!host) return;
+
+        const portStr = await vscode.window.showInputBox({
+            prompt: 'MLLP Port',
+            value: defaultPort ? String(defaultPort) : '',
+            placeHolder: 'e.g. 2575',
+        });
+        if (!portStr) return;
+
+        const port = parseInt(portStr, 10);
+        if (isNaN(port) || port < 1 || port > 65535) {
+            vscode.window.showErrorMessage('Invalid port number.');
+            return;
+        }
+
+        try {
+            const ack = await vscode.window.withProgress(
+                { location: vscode.ProgressLocation.Notification, title: `Sending HL7 message to ${host}:${port}...` },
+                () => sendMessage(host, port, text)
+            );
+            mllpOutputChannel.clear();
+            mllpOutputChannel.appendLine(`--- ACK from ${host}:${port} ---`);
+            mllpOutputChannel.appendLine(ack.replace(/\r/g, '\n'));
+            mllpOutputChannel.show(true);
+        } catch (err) {
+            vscode.window.showErrorMessage(`MLLP send failed: ${err.message}`);
+        }
+    });
+
+    context.subscriptions.push(sendMessageCommand);
+
+    const listenerStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
+    listenerStatusBar.command = 'extension.stopListener';
+    context.subscriptions.push(listenerStatusBar);
+
+    const startListenerCommand = vscode.commands.registerCommand('extension.startListener', async () => {
+        if (mllpServer) {
+            vscode.window.showInformationMessage('MLLP listener is already running.');
+            return;
+        }
+
+        const config = vscode.workspace.getConfiguration('hl7.mllp');
+        const defaultPort = config.get('port') || 2575;
+
+        const portStr = await vscode.window.showInputBox({
+            prompt: 'MLLP Listen Port',
+            value: String(defaultPort),
+            placeHolder: 'e.g. 2575',
+        });
+        if (!portStr) return;
+
+        const port = parseInt(portStr, 10);
+        if (isNaN(port) || port < 1 || port > 65535) {
+            vscode.window.showErrorMessage('Invalid port number.');
+            return;
+        }
+
+        mllpServer = net.createServer((socket) => {
+            let buffer = '';
+
+            socket.on('data', (data) => {
+                buffer += data.toString();
+                if (buffer.length > 1024 * 1024) {
+                    socket.destroy();
+                    return;
+                }
+                if (!buffer.includes(EB)) return;
+
+                const start = buffer.indexOf(SB);
+                const end = buffer.indexOf(EB);
+                const message = buffer.substring(start === -1 ? 0 : start + 1, end);
+                buffer = '';
+
+                // Send ACK
+                const ack = buildAck(message);
+                socket.write(SB + ack + EB + CR);
+
+                // Open received message in a new .hl7 editor tab
+                receivedCount++;
+                const content = message.replace(/\r/g, '\n');
+                const uri = vscode.Uri.parse('untitled:received_' + receivedCount + '.hl7');
+                vscode.workspace.openTextDocument(uri).then((doc) => {
+                    vscode.window.showTextDocument(doc).then((editor) => {
+                        editor.edit((te) => {
+                            te.insert(new vscode.Position(0, 0), content);
+                        });
+                    });
+                });
+            });
+        });
+
+        mllpServer.on('error', (err) => {
+            vscode.window.showErrorMessage(`MLLP listener error: ${err.message}`);
+            mllpServer = null;
+            listenerStatusBar.hide();
+        });
+
+        mllpServer.listen(port, () => {
+            context.globalState.update('mllpListenerPort', port);
+            listenerStatusBar.text = `$(radio-tower) MLLP Listening: ${port}`;
+            listenerStatusBar.tooltip = 'Click to stop MLLP listener';
+            listenerStatusBar.show();
+            vscode.window.showInformationMessage(`MLLP listener started on port ${port}.`);
+        });
+    });
+
+    context.subscriptions.push(startListenerCommand);
+
+    const stopListenerCommand = vscode.commands.registerCommand('extension.stopListener', () => {
+        if (!mllpServer) {
+            vscode.window.showInformationMessage('No MLLP listener running.');
+            return;
+        }
+        mllpServer.close();
+        mllpServer = null;
+        context.globalState.update('mllpListenerPort', undefined);
+        listenerStatusBar.hide();
+        vscode.window.showInformationMessage('MLLP listener stopped.');
+    });
+
+    context.subscriptions.push(stopListenerCommand);
+
+    const copyFieldPathCommand = vscode.commands.registerCommand('extension.copyFieldPath', () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) return;
+        const pos = editor.selection.active;
+        const line = editor.document.lineAt(pos.line).text;
+        const version = getVersion(editor.document);
+        const info = getFieldInfo(line, pos.character, version);
+        if (!info) return;
+        const path = info.components.length > 1
+            ? `${info.segment}-${info.fieldNumber}.${info.componentIndex + 1}`
+            : `${info.segment}-${info.fieldNumber}`;
+        vscode.env.clipboard.writeText(path);
+        vscode.window.showInformationMessage(`Copied: ${path}`);
+    });
+    context.subscriptions.push(copyFieldPathCommand);
+
     const hoverProvider = vscode.languages.registerHoverProvider('hl7', {
         provideHover(document, position) {
             const version = getVersion(document);
@@ -380,9 +706,20 @@ function activate(context) {
     context.subscriptions.push(hoverProvider);
 }
 
+function deactivate() {
+    if (mllpServer) {
+        mllpServer.close();
+        mllpServer = null;
+    }
+}
+
 exports.activate = activate;
+exports.deactivate = deactivate;
 exports.tokenizeLine = tokenizeLine;
 exports.getFieldInfo = getFieldInfo;
 exports.getVersion = getVersion;
 exports.getSegmentCounts = getSegmentCounts;
 exports.filterSegmentLines = filterSegmentLines;
+exports.getFieldRange = getFieldRange;
+exports.sendMessage = sendMessage;
+exports.buildAck = buildAck;

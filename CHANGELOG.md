@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.22
+- Add field highlighting
+- Add MLLP Send/Receive for testing HL7 messages
+- Add context menu shortcuts to: Copy field path, tokenize, or filter the segment
+- Add segment count and HL7 version status bar
+- Add HL7 v2.5.1 dictionary support
+- Add rate extension feedback mechanism
+
 ## 0.0.21
 - Improve documentation
 - Update Logo

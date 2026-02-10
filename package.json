@@ -25,7 +25,9 @@
         "vscode": "^1.75.0"
     },
     "categories": [
-        "Languages"
+        "Languages",
+        "Formatters",
+        "Other"
     ],
     "keywords": [
         "hl7",

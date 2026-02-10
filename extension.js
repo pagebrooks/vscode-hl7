@@ -5,6 +5,25 @@ const SB = '\x0b';
 const EB = '\x1c';
 const CR = '\x0d';
 
+let mllpServer = null;
+let receivedCount = 0;
+
+function buildAck(message) {
+    const segments = message.split('\r');
+    const mshFields = segments[0].split('|');
+    const sendingApp = mshFields[2] || '';
+    const sendingFac = mshFields[3] || '';
+    const recvApp = mshFields[4] || '';
+    const recvFac = mshFields[5] || '';
+    const controlId = mshFields[9] || '';
+    const version = mshFields[11] || '2.5.1';
+    const now = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+    return [
+        `MSH|^~\\&|${recvApp}|${recvFac}|${sendingApp}|${sendingFac}|${now}||ACK|${controlId}|P|${version}`,
+        `MSA|AA|${controlId}`,
+    ].join('\r');
+}
+
 function sendMessage(host, port, hl7Text) {
     return new Promise((resolve, reject) => {
         const socket = new net.Socket();
@@ -257,6 +276,9 @@ function getFieldRange(lineText, segment, fieldNumber, componentIndex) {
 
 function activate(context) {
     console.log('HL7 Extension is now active');
+
+    // Clean up stale listener port from a previous session that didn't deactivate cleanly
+    context.globalState.update('mllpListenerPort', undefined);
 
     // Record install date and show a one-time rating prompt after 30 days
     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -543,6 +565,97 @@ function activate(context) {
 
     context.subscriptions.push(sendMessageCommand);
 
+    const listenerStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
+    listenerStatusBar.command = 'extension.stopListener';
+    context.subscriptions.push(listenerStatusBar);
+
+    const startListenerCommand = vscode.commands.registerCommand('extension.startListener', async () => {
+        if (mllpServer) {
+            vscode.window.showInformationMessage('MLLP listener is already running.');
+            return;
+        }
+
+        const config = vscode.workspace.getConfiguration('hl7.mllp');
+        const defaultPort = config.get('port') || 2575;
+
+        const portStr = await vscode.window.showInputBox({
+            prompt: 'MLLP Listen Port',
+            value: String(defaultPort),
+            placeHolder: 'e.g. 2575',
+        });
+        if (!portStr) return;
+
+        const port = parseInt(portStr, 10);
+        if (isNaN(port) || port < 1 || port > 65535) {
+            vscode.window.showErrorMessage('Invalid port number.');
+            return;
+        }
+
+        mllpServer = net.createServer((socket) => {
+            let buffer = '';
+
+            socket.on('data', (data) => {
+                buffer += data.toString();
+                if (buffer.length > 1024 * 1024) {
+                    socket.destroy();
+                    return;
+                }
+                if (!buffer.includes(EB)) return;
+
+                const start = buffer.indexOf(SB);
+                const end = buffer.indexOf(EB);
+                const message = buffer.substring(start === -1 ? 0 : start + 1, end);
+                buffer = '';
+
+                // Send ACK
+                const ack = buildAck(message);
+                socket.write(SB + ack + EB + CR);
+
+                // Open received message in a new .hl7 editor tab
+                receivedCount++;
+                const content = message.replace(/\r/g, '\n');
+                const uri = vscode.Uri.parse('untitled:received_' + receivedCount + '.hl7');
+                vscode.workspace.openTextDocument(uri).then((doc) => {
+                    vscode.window.showTextDocument(doc).then((editor) => {
+                        editor.edit((te) => {
+                            te.insert(new vscode.Position(0, 0), content);
+                        });
+                    });
+                });
+            });
+        });
+
+        mllpServer.on('error', (err) => {
+            vscode.window.showErrorMessage(`MLLP listener error: ${err.message}`);
+            mllpServer = null;
+            listenerStatusBar.hide();
+        });
+
+        mllpServer.listen(port, () => {
+            context.globalState.update('mllpListenerPort', port);
+            listenerStatusBar.text = `$(radio-tower) MLLP Listening: ${port}`;
+            listenerStatusBar.tooltip = 'Click to stop MLLP listener';
+            listenerStatusBar.show();
+            vscode.window.showInformationMessage(`MLLP listener started on port ${port}.`);
+        });
+    });
+
+    context.subscriptions.push(startListenerCommand);
+
+    const stopListenerCommand = vscode.commands.registerCommand('extension.stopListener', () => {
+        if (!mllpServer) {
+            vscode.window.showInformationMessage('No MLLP listener running.');
+            return;
+        }
+        mllpServer.close();
+        mllpServer = null;
+        context.globalState.update('mllpListenerPort', undefined);
+        listenerStatusBar.hide();
+        vscode.window.showInformationMessage('MLLP listener stopped.');
+    });
+
+    context.subscriptions.push(stopListenerCommand);
+
     const hoverProvider = vscode.languages.registerHoverProvider('hl7', {
         provideHover(document, position) {
             const version = getVersion(document);
@@ -577,7 +690,15 @@ function activate(context) {
     context.subscriptions.push(hoverProvider);
 }
 
+function deactivate() {
+    if (mllpServer) {
+        mllpServer.close();
+        mllpServer = null;
+    }
+}
+
 exports.activate = activate;
+exports.deactivate = deactivate;
 exports.tokenizeLine = tokenizeLine;
 exports.getFieldInfo = getFieldInfo;
 exports.getVersion = getVersion;
@@ -585,3 +706,4 @@ exports.getSegmentCounts = getSegmentCounts;
 exports.filterSegmentLines = filterSegmentLines;
 exports.getFieldRange = getFieldRange;
 exports.sendMessage = sendMessage;
+exports.buildAck = buildAck;

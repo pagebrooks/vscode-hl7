@@ -74,6 +74,12 @@
         },{
             "command": "extension.sendMessage",
             "title": "HL7: Send Message"
+        },{
+            "command": "extension.startListener",
+            "title": "HL7: Start MLLP Listener"
+        },{
+            "command": "extension.stopListener",
+            "title": "HL7: Stop MLLP Listener"
         }],
         "configuration": {
             "title": "HL7",

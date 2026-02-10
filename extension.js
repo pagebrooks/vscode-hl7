@@ -182,6 +182,36 @@ function getSegmentCounts(text) {
     return counts;
 }
 
+function getFieldRange(lineText, segment, fieldNumber, componentIndex) {
+    const tokens = lineText.split('|');
+    if (tokens[0] !== segment) return null;
+
+    const tokenIndex = (segment === 'MSH') ? fieldNumber - 1 : fieldNumber;
+    if (tokenIndex < 1 || tokenIndex >= tokens.length) return null;
+
+    // Walk pipes to find the character offset of the target token
+    let charOffset = 0;
+    for (let i = 0; i < tokenIndex; i++) {
+        charOffset += tokens[i].length + 1; // +1 for pipe
+    }
+
+    const fieldContent = tokens[tokenIndex];
+    const components = fieldContent.split('^');
+
+    if (componentIndex != null) {
+        if (componentIndex >= components.length) return null;
+        if (components.length > 1) {
+            let compOffset = charOffset;
+            for (let j = 0; j < componentIndex; j++) {
+                compOffset += components[j].length + 1; // +1 for ^
+            }
+            return { start: compOffset, end: compOffset + components[componentIndex].length };
+        }
+    }
+
+    return { start: charOffset, end: charOffset + fieldContent.length };
+}
+
 function activate(context) {
     console.log('HL7 Extension is now active');
 
@@ -202,6 +232,57 @@ function activate(context) {
         rateStatusBar.show();
         context.subscriptions.push(rateCommand, rateStatusBar);
     }
+
+    // Field highlighting — decorates matching fields across all lines
+    const fieldHighlight = vscode.window.createTextEditorDecorationType({
+        backgroundColor: new vscode.ThemeColor('editor.wordHighlightBackground'),
+        borderColor: new vscode.ThemeColor('editor.wordHighlightBorder'),
+    });
+    context.subscriptions.push(fieldHighlight);
+
+    function updateFieldHighlight(editor) {
+        if (!editor || editor.document.languageId !== 'hl7') {
+            editor?.setDecorations(fieldHighlight, []);
+            return;
+        }
+        const doc = editor.document;
+        const pos = editor.selection.active;
+        const line = doc.lineAt(pos.line).text;
+        const pipeIdx = line.indexOf('|');
+        const ranges = [];
+
+        if (pipeIdx === -1 || pos.character < pipeIdx) {
+            // Cursor is on segment name — highlight same segment on all lines
+            const segment = line.substring(0, pipeIdx === -1 ? line.length : pipeIdx);
+            if (!segment) { editor.setDecorations(fieldHighlight, []); return; }
+            for (let i = 0; i < doc.lineCount; i++) {
+                const l = doc.lineAt(i).text;
+                if (l.split('|')[0] === segment) {
+                    ranges.push(new vscode.Range(i, 0, i, segment.length));
+                }
+            }
+        } else {
+            const version = getVersion(doc);
+            const info = getFieldInfo(line, pos.character, version);
+            if (!info) { editor.setDecorations(fieldHighlight, []); return; }
+            const compIdx = info.components.length > 1 ? info.componentIndex : null;
+            for (let i = 0; i < doc.lineCount; i++) {
+                const r = getFieldRange(doc.lineAt(i).text, info.segment, info.fieldNumber, compIdx);
+                if (r) {
+                    ranges.push(new vscode.Range(i, r.start, i, r.end));
+                }
+            }
+        }
+        editor.setDecorations(fieldHighlight, ranges);
+    }
+
+    updateFieldHighlight(vscode.window.activeTextEditor);
+    context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection((e) => {
+        updateFieldHighlight(e.textEditor);
+    }));
+    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor((editor) => {
+        updateFieldHighlight(editor);
+    }));
 
     let genCount = 0;
     let tokenDoc = null;
@@ -405,3 +486,4 @@ exports.getFieldInfo = getFieldInfo;
 exports.getVersion = getVersion;
 exports.getSegmentCounts = getSegmentCounts;
 exports.filterSegmentLines = filterSegmentLines;
+exports.getFieldRange = getFieldRange;

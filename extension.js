@@ -184,6 +184,25 @@ function getSegmentCounts(text) {
 
 function activate(context) {
     console.log('HL7 Extension is now active');
+
+    // Record install date and show a one-time rating prompt after 30 days
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+    if (!context.globalState.get('installDate')) {
+        context.globalState.update('installDate', Date.now());
+    }
+    const installDate = context.globalState.get('installDate');
+    if (installDate && Date.now() - installDate >= THIRTY_DAYS_MS && !context.globalState.get('ratingPromptShown')) {
+        context.globalState.update('ratingPromptShown', true);
+        const rateCommand = vscode.commands.registerCommand('extension.rateExtension', () => {
+            vscode.env.openExternal(vscode.Uri.parse('https://marketplace.visualstudio.com/items?itemName=pbrooks.hl7&ssr=false#review-details'));
+        });
+        const rateStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 0);
+        rateStatusBar.text = '$(star) Please rate my HL7 extension';
+        rateStatusBar.command = 'extension.rateExtension';
+        rateStatusBar.show();
+        context.subscriptions.push(rateCommand, rateStatusBar);
+    }
+
     let genCount = 0;
     let tokenDoc = null;
 

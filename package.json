@@ -71,7 +71,25 @@
         },{
             "command": "extension.toggleAutoTokenize",
             "title": "HL7: Toggle Auto-Tokenize"
-        }]
+        },{
+            "command": "extension.sendMessage",
+            "title": "HL7: Send Message"
+        }],
+        "configuration": {
+            "title": "HL7",
+            "properties": {
+                "hl7.mllp.host": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Default MLLP host"
+                },
+                "hl7.mllp.port": {
+                    "type": "number",
+                    "default": 2575,
+                    "description": "Default MLLP port"
+                }
+            }
+        }
     },
     "scripts": {
         "test": "mocha --require test/setup.js test/**/*.test.js"

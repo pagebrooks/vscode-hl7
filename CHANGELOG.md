@@ -1,8 +1,8 @@
 # Changelog
 
 ## 0.0.22
-- Add rate extension feedback mechanism.
 - Add field highlighting
+- Add rate extension feedback mechanism.
 
 ## 0.0.21
 - Improve documentation

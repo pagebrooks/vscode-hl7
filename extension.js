@@ -1,4 +1,47 @@
 const vscode = require('vscode');
+const net = require('net');
+
+const SB = '\x0b';
+const EB = '\x1c';
+const CR = '\x0d';
+
+function sendMessage(host, port, hl7Text) {
+    return new Promise((resolve, reject) => {
+        const socket = new net.Socket();
+        let response = '';
+
+        socket.setTimeout(10000);
+
+        socket.connect(port, host, () => {
+            socket.write(SB + hl7Text + EB + CR);
+        });
+
+        socket.on('data', (data) => {
+            response += data.toString();
+            if (response.length > 1024 * 1024) {
+                socket.destroy();
+                reject(new Error('Response exceeded 1 MB limit'));
+                return;
+            }
+            if (response.includes(EB)) {
+                socket.destroy();
+                // Unwrap MLLP framing from response
+                const start = response.indexOf(SB);
+                const end = response.indexOf(EB);
+                resolve(response.substring(start === -1 ? 0 : start + 1, end));
+            }
+        });
+
+        socket.on('timeout', () => {
+            socket.destroy();
+            reject(new Error('Connection timed out after 10 seconds'));
+        });
+
+        socket.on('error', (err) => {
+            reject(err);
+        });
+    });
+}
 
 const definitions = {
     '2.5.1': {
@@ -446,6 +489,60 @@ function activate(context) {
 
     context.subscriptions.push(toggleAutoTokenizeCommand);
 
+    const mllpOutputChannel = vscode.window.createOutputChannel('HL7 MLLP');
+    context.subscriptions.push(mllpOutputChannel);
+
+    const sendMessageCommand = vscode.commands.registerCommand('extension.sendMessage', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            vscode.window.showErrorMessage('No active editor.');
+            return;
+        }
+
+        const selection = editor.selection;
+        let text = selection.isEmpty ? editor.document.getText() : editor.document.getText(selection);
+        text = text.replace(/\r\n/g, '\r').replace(/\n/g, '\r');
+
+        const config = vscode.workspace.getConfiguration('hl7.mllp');
+        const defaultHost = config.get('host') || '';
+        const defaultPort = config.get('port') || 0;
+
+        const host = await vscode.window.showInputBox({
+            prompt: 'MLLP Host',
+            value: defaultHost,
+            placeHolder: 'e.g. 127.0.0.1',
+        });
+        if (!host) return;
+
+        const portStr = await vscode.window.showInputBox({
+            prompt: 'MLLP Port',
+            value: defaultPort ? String(defaultPort) : '',
+            placeHolder: 'e.g. 2575',
+        });
+        if (!portStr) return;
+
+        const port = parseInt(portStr, 10);
+        if (isNaN(port) || port < 1 || port > 65535) {
+            vscode.window.showErrorMessage('Invalid port number.');
+            return;
+        }
+
+        try {
+            const ack = await vscode.window.withProgress(
+                { location: vscode.ProgressLocation.Notification, title: `Sending HL7 message to ${host}:${port}...` },
+                () => sendMessage(host, port, text)
+            );
+            mllpOutputChannel.clear();
+            mllpOutputChannel.appendLine(`--- ACK from ${host}:${port} ---`);
+            mllpOutputChannel.appendLine(ack.replace(/\r/g, '\n'));
+            mllpOutputChannel.show(true);
+        } catch (err) {
+            vscode.window.showErrorMessage(`MLLP send failed: ${err.message}`);
+        }
+    });
+
+    context.subscriptions.push(sendMessageCommand);
+
     const hoverProvider = vscode.languages.registerHoverProvider('hl7', {
         provideHover(document, position) {
             const version = getVersion(document);
@@ -487,3 +584,4 @@ exports.getVersion = getVersion;
 exports.getSegmentCounts = getSegmentCounts;
 exports.filterSegmentLines = filterSegmentLines;
 exports.getFieldRange = getFieldRange;
+exports.sendMessage = sendMessage;

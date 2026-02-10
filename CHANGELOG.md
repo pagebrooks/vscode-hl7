@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.22
+- Add rate extension feedback mechanism.
+- Add field highlighting
+
 ## 0.0.21
 - Improve documentation
 - Update Logo

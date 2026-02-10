@@ -656,6 +656,22 @@ function activate(context) {
 
     context.subscriptions.push(stopListenerCommand);
 
+    const copyFieldPathCommand = vscode.commands.registerCommand('extension.copyFieldPath', () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) return;
+        const pos = editor.selection.active;
+        const line = editor.document.lineAt(pos.line).text;
+        const version = getVersion(editor.document);
+        const info = getFieldInfo(line, pos.character, version);
+        if (!info) return;
+        const path = info.components.length > 1
+            ? `${info.segment}-${info.fieldNumber}.${info.componentIndex + 1}`
+            : `${info.segment}-${info.fieldNumber}`;
+        vscode.env.clipboard.writeText(path);
+        vscode.window.showInformationMessage(`Copied: ${path}`);
+    });
+    context.subscriptions.push(copyFieldPathCommand);
+
     const hoverProvider = vscode.languages.registerHoverProvider('hl7', {
         provideHover(document, position) {
             const version = getVersion(document);

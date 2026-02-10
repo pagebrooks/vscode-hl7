@@ -80,7 +80,17 @@
         },{
             "command": "extension.stopListener",
             "title": "HL7: Stop MLLP Listener"
+        },{
+            "command": "extension.copyFieldPath",
+            "title": "HL7: Copy Field Path"
         }],
+        "menus": {
+            "editor/context": [{
+                "command": "extension.copyFieldPath",
+                "when": "editorLangId == hl7",
+                "group": "9_hl7"
+            }]
+        },
         "configuration": {
             "title": "HL7",
             "properties": {

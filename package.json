@@ -86,6 +86,14 @@
         }],
         "menus": {
             "editor/context": [{
+                "command": "extension.filterSegment",
+                "when": "editorLangId == hl7",
+                "group": "9_hl7"
+            },{
+                "command": "extension.tokenizeLine",
+                "when": "editorLangId == hl7",
+                "group": "9_hl7"
+            },{
                 "command": "extension.copyFieldPath",
                 "when": "editorLangId == hl7",
                 "group": "9_hl7"

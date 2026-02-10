@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { tokenizeLine, getFieldInfo, getVersion, getSegmentCounts, filterSegmentLines, getFieldRange } = require('../extension');
+const { tokenizeLine, getFieldInfo, getVersion, getSegmentCounts, filterSegmentLines, getFieldRange, buildAck } = require('../extension');
 
 // Minimal document mock for tokenizeLine
 function mockDoc(lines) {
@@ -297,5 +297,59 @@ describe('getFieldRange', function () {
         // PID-5 whole field: Doe^John^M starts at 20, length 10
         const result = getFieldRange('PID|1||12345^^^MRN||Doe^John^M', 'PID', 5, null);
         assert.deepStrictEqual(result, { start: 20, end: 30 });
+    });
+});
+
+describe('buildAck', function () {
+    it('swaps sending and receiving application/facility', function () {
+        const msg = 'MSH|^~\\&|SendApp|SendFac|RecvApp|RecvFac|20240101120000||ADT^A01|CTRL1|P|2.5.1\rPID|||123';
+        const ack = buildAck(msg);
+        const fields = ack.split('\r')[0].split('|');
+
+        assert.strictEqual(fields[2], 'RecvApp');
+        assert.strictEqual(fields[3], 'RecvFac');
+        assert.strictEqual(fields[4], 'SendApp');
+        assert.strictEqual(fields[5], 'SendFac');
+    });
+
+    it('preserves control ID in MSH-10 and MSA-2', function () {
+        const msg = 'MSH|^~\\&|S|SF|R|RF|20240101||ADT^A01|MSG999|P|2.7.1\rPID|||123';
+        const ack = buildAck(msg);
+        const segments = ack.split('\r');
+        const mshFields = segments[0].split('|');
+        const msaFields = segments[1].split('|');
+
+        assert.strictEqual(mshFields[9], 'MSG999');
+        assert.strictEqual(msaFields[2], 'MSG999');
+    });
+
+    it('sets message type to ACK and MSA-1 to AA', function () {
+        const msg = 'MSH|^~\\&|S|SF|R|RF|20240101||ADT^A01|1|P|2.5.1';
+        const ack = buildAck(msg);
+        const segments = ack.split('\r');
+        const mshFields = segments[0].split('|');
+        const msaFields = segments[1].split('|');
+
+        assert.strictEqual(mshFields[8], 'ACK');
+        assert.strictEqual(msaFields[0], 'MSA');
+        assert.strictEqual(msaFields[1], 'AA');
+    });
+
+    it('preserves HL7 version from original message', function () {
+        const msg = 'MSH|^~\\&|S|SF|R|RF|20240101||ADT^A01|1|P|2.7.1';
+        const ack = buildAck(msg);
+        const fields = ack.split('\r')[0].split('|');
+
+        assert.strictEqual(fields[11], '2.7.1');
+    });
+
+    it('handles missing optional MSH fields gracefully', function () {
+        const msg = 'MSH|^~\\&|||||||ADT^A01|CTRL1|P|2.5.1';
+        const ack = buildAck(msg);
+        const segments = ack.split('\r');
+
+        assert.strictEqual(segments.length, 2);
+        assert.ok(segments[0].startsWith('MSH|'));
+        assert.ok(segments[1].startsWith('MSA|AA|'));
     });
 });
